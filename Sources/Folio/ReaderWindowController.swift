@@ -958,7 +958,8 @@ final class ReaderWindowController: NSWindowController, NSWindowDelegate, NSTool
         case #selector(toggleAISidebar(_:)):
             item.title = aiItem.isCollapsed ? "AI 사이드바 보기" : "AI 사이드바 가리기"
             return true
-        case #selector(highlightSelection(_:)), #selector(explainSelection(_:)), #selector(translateSelection(_:)),
+        case #selector(highlightSelection(_:)), #selector(highlightWithColorItem(_:)),
+             #selector(explainSelection(_:)), #selector(translateSelection(_:)),
              #selector(useSelectionForFind(_:)):
             return selectedText != nil
         case #selector(findNext(_:)), #selector(findPrevious(_:)):

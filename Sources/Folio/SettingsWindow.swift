@@ -43,6 +43,7 @@ struct SettingsView: View {
         TabView {
             providersTab.tabItem { Label("AI 제공자", systemImage: "sparkles") }
             generalTab.tabItem { Label("일반", systemImage: "gearshape") }
+            ShortcutsTab().tabItem { Label("단축키", systemImage: "keyboard") }
         }
         .padding(16)
         .frame(width: 560, height: 560)

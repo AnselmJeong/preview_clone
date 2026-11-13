@@ -146,7 +146,14 @@ enum MainMenu {
     private static func toolsMenu() -> NSMenu {
         let m = NSMenu(title: "도구")
         m.addItem(item("하이라이트", #selector(ReaderWindowController.highlightSelection(_:)), "h", [.command, .control]))
-        m.addItem(item("영역 캡처해서 AI에 첨부", #selector(ReaderWindowController.startRegionCapture(_:)), "4", [.command, .control, .shift]))
+        let colors = NSMenu(title: "하이라이트 색상")
+        for c in HighlightColor.allCases {
+            let i = item(c.name, #selector(ReaderWindowController.highlightWithColorItem(_:)), "\(c.rawValue + 1)", [.command, .control], tag: c.rawValue)
+            i.image = c.swatch
+            colors.addItem(i)
+        }
+        m.addItem(submenu(colors))
+        m.addItem(item("영역 캡처해서 AI에 첨부", #selector(ReaderWindowController.startRegionCapture(_:)), "c", [.command, .control]))
         m.addItem(.separator())
         m.addItem(item("선택 영역을 AI에게 묻기", #selector(ReaderWindowController.askAIAboutSelection(_:)), "a", [.command, .control]))
         m.addItem(item("선택 영역 설명", #selector(ReaderWindowController.explainSelection(_:)), "", []))

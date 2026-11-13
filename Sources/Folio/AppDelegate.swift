@@ -25,6 +25,7 @@ extension Notification.Name {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var openedFileAtLaunch = false
+    private var keyMonitor: Any?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = MainMenu.build()
@@ -34,6 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installShortcutMonitor()
         // Like Preview: with nothing to open, show the Open panel.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self else { return }
@@ -60,6 +62,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
+
+    /// Matches the AI-sidebar shortcuts by physical key code, before menu key-equivalent matching.
+    /// The menu's "0" equivalent depends on the characters the input source produces for ⌥0,
+    /// which can differ (e.g. Korean 2-Set, remappers); the key code does not. ⌃⌘I is a hidden
+    /// alternate that is easier to press.
+    private func installShortcutMonitor() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                .subtracting([.capsLock, .numericPad, .function])
+            let isOptionCmd0 = event.keyCode == 29 && mods == [.command, .option]
+            let isControlCmdI = event.keyCode == 34 && mods == [.command, .control]
+            guard isOptionCmd0 || isControlCmdI else { return event }
+            let handled = NSApp.sendAction(#selector(ReaderWindowController.toggleAISidebar(_:)), to: nil, from: nil)
+            return handled ? nil : event
+        }
+    }
 
     // MARK: App-level actions
 
