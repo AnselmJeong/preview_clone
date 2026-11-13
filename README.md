@@ -9,7 +9,7 @@ macOS Preview를 PDF 읽기 용도로 대체하는 가볍고 빠른 PDF 리더�
 ```bash
 scripts/build.sh            # build/Folio.app 생성
 scripts/build.sh install    # /Applications(또는 ~/Applications)에 설치
-swift test                  # 핵심 로직 단위 테스트
+scripts/test.sh             # 핵심 로직 단위 테스트 (Xcode가 있으면 `swift test`도 가능)
 ```
 
 설치 후 Finder에서 PDF를 선택하고 ⌘I → "다음으로 열기"에서 Folio를 고른 뒤 "모두 변경"을 누르거나, Folio 설정(⌘,) → 일반 → "Folio를 기본 PDF 앱으로 설정"을 누르세요.
