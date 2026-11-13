@@ -1,7 +1,14 @@
 import AppKit
-import PDFKit
+@preconcurrency import PDFKit
 import SwiftUI
 import FolioCore
+
+/// Sendable weak reference so detached tasks can hop back to the main actor without
+/// capturing a mutable `weak var self`.
+final class WeakRef<T: AnyObject>: @unchecked Sendable {
+    weak var value: T?
+    init(_ value: T) { self.value = value }
+}
 
 /// Builds a view the first time it is needed, so hidden sidebars cost nothing at launch.
 final class LazyHostingViewController: NSViewController {
@@ -213,7 +220,8 @@ final class ReaderWindowController: NSWindowController, NSWindowDelegate, NSTool
         if let rec = try? store.document(path: url.path, size: attrs.size, mtime: attrs.mtime) {
             applyRecord(rec)
         }
-        Task.detached(priority: .utility) { [weak self] in
+        let owner = WeakRef(self)
+        Task.detached(priority: .utility) {
             guard let bg = PDFDocument(url: url) else { return }
             if bg.isLocked { return }  // encrypted: identity by hash only would need the password; skip
             let count = bg.pageCount
@@ -225,8 +233,8 @@ final class ReaderWindowController: NSWindowController, NSWindowDelegate, NSTool
                 pageCount: count, fileSize: attrs.size, fileMTime: attrs.mtime)
             guard let rec = try? store.resolveDocument(fp, path: url.path, title: title) else { return }
             await MainActor.run {
-                self?.currentSHA = fp.sha256
-                self?.applyRecord(rec)
+                owner.value?.currentSHA = fp.sha256
+                owner.value?.applyRecord(rec)
             }
             let cached = (try? store.pageText(documentID: rec.id)) ?? []
             if cached.count != count {
@@ -260,7 +268,8 @@ final class ReaderWindowController: NSWindowController, NSWindowDelegate, NSTool
 
     func documentDidSave() {
         guard let url = readerDocument?.fileURL, let store = AppServices.shared.store, let rec = documentRecord else { return }
-        Task.detached(priority: .utility) { [weak self] in
+        let owner = WeakRef(self)
+        Task.detached(priority: .utility) {
             guard let sha = try? DocumentIdentity.sha256(of: url) else { return }
             let attrs = DocumentIdentity.fileAttributes(of: url)
             try? store.addHash(sha, to: rec.id)
@@ -271,7 +280,7 @@ final class ReaderWindowController: NSWindowController, NSWindowDelegate, NSTool
                 if let pid = DocumentIdentity.pdfTrailerID(of: url) { updated.pdfID = pid }
                 try? store.upsert(updated)
             }
-            await MainActor.run { self?.currentSHA = sha }
+            await MainActor.run { owner.value?.currentSHA = sha }
         }
     }
 
@@ -517,9 +526,10 @@ final class ReaderWindowController: NSWindowController, NSWindowDelegate, NSTool
     }
 
     nonisolated func didMatchString(_ instance: PDFSelection) {
+        nonisolated(unsafe) let selection = instance
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            self.pendingHits.append(instance)
+            self.pendingHits.append(selection)
             if self.pendingHits.count % 100 == 0 { self.publishHits(final: false) }
         }
     }
