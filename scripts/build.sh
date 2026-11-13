@@ -24,7 +24,20 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Folio"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp -R Resources/ChatRenderer "$APP/Contents/Resources/ChatRenderer"
-if [ -f Resources/AppIcon.icns ]; then cp Resources/AppIcon.icns "$APP/Contents/Resources/"; fi
+# App icon: build AppIcon.icns from the 1024 px master (Resources/Icon/AppIcon.svg → AppIcon-1024.png).
+ICON_SRC=Resources/Icon/AppIcon-1024.png
+ICNS=build/AppIcon.icns
+if [ -f "$ICON_SRC" ] && { [ ! -f "$ICNS" ] || [ "$ICON_SRC" -nt "$ICNS" ]; }; then
+  SET=build/AppIcon.iconset
+  rm -rf "$SET" && mkdir -p "$SET"
+  for s in 16 32 128 256 512; do
+    sips -z $s $s "$ICON_SRC" --out "$SET/icon_${s}x${s}.png" >/dev/null
+    sips -z $((s * 2)) $((s * 2)) "$ICON_SRC" --out "$SET/icon_${s}x${s}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$SET" -o "$ICNS"
+  rm -rf "$SET"
+fi
+[ -f "$ICNS" ] && cp "$ICNS" "$APP/Contents/Resources/AppIcon.icns"
 
 # Ad-hoc signature with the hardened runtime so Gatekeeper and Keychain treat the app consistently.
 codesign --force --sign - --options runtime --timestamp=none "$APP" >/dev/null
