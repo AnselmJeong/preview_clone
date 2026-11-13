@@ -164,6 +164,26 @@ final class ChatViewModel: ObservableObject {
         requestInputFocus()
     }
 
+    func startCapture() {
+        host?.startRegionCapture(nil)
+    }
+
+    func chooseImage() {
+        guard let window = host?.window else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = true
+        panel.beginSheetModal(for: window) { [weak self] resp in
+            guard resp == .OK else { return }
+            for url in panel.urls {
+                guard let data = try? Data(contentsOf: url) else { continue }
+                let type = UTType(filenameExtension: url.pathExtension)
+                let mt = type?.conforms(to: .jpeg) == true ? "image/jpeg" : (type?.conforms(to: .png) == true ? "image/png" : "image/other")
+                self?.addImage(data: data, mediaType: mt, page: nil)
+            }
+        }
+    }
+
     func removePendingImage(_ id: UUID) {
         pendingImages.removeAll { $0.id == id }
     }
@@ -263,8 +283,16 @@ final class ChatViewModel: ObservableObject {
         pendingImages = []
         status = nil
 
+        startReply(conversation: conv)
+    }
+
+    /// Appends an empty assistant message and streams the reply to the latest user message.
+    private func startReply(conversation conv: ConversationRecord) {
+        guard let store, let documentID, let host,
+              let userMessage = messages.last(where: { $0.role == .user }) else { return }
+        let text = userMessage.content
         let assistant = MessageRecord(conversationID: conv.id, role: .assistant, content: "",
-                                      createdAt: Date().timeIntervalSince1970 + 0.001)
+                                      createdAt: max(Date().timeIntervalSince1970, userMessage.createdAt + 0.001))
         messages.append(assistant)
         streamingMessageID = assistant.id
         transcriptVersion += 1
@@ -373,6 +401,71 @@ final class ChatViewModel: ObservableObject {
 
     func stop() {
         task?.cancel()
+    }
+
+    // MARK: Per-message actions
+
+    func handle(_ action: TranscriptAction, messageID: String) {
+        switch action {
+        case .export: exportMessage(id: messageID)
+        case .regenerate: regenerate(id: messageID)
+        case .delete: deleteMessage(id: messageID)
+        }
+    }
+
+    private func regenerate(id: String) {
+        guard !isStreaming, var conv = current, let idx = messages.lastIndex(where: { $0.id == id }),
+              messages[idx].role == .assistant, idx == messages.count - 1 else { return }
+        try? store?.deleteMessage(id: id)
+        messages.remove(at: idx)
+        // The Claude Code session already holds the old answer; start a fresh session from the transcript.
+        if conv.cliSessionID != nil {
+            conv.cliSessionID = nil
+            current = conv
+            try? store?.save(conv)
+        }
+        conv.provider = provider.rawValue
+        conv.model = model
+        current = conv
+        try? store?.save(conv)
+        status = nil
+        startReply(conversation: conv)
+    }
+
+    private func deleteMessage(id: String) {
+        guard !isStreaming, let idx = messages.firstIndex(where: { $0.id == id }) else { return }
+        try? store?.deleteMessage(id: id)
+        messages.remove(at: idx)
+        if var conv = current, conv.cliSessionID != nil {
+            conv.cliSessionID = nil  // keep the model's memory consistent with what's on screen
+            current = conv
+            try? store?.save(conv)
+        }
+        transcriptVersion += 1
+    }
+
+    private func exportMessage(id: String) {
+        guard let m = messages.first(where: { $0.id == id }), let conv = current, let host, let window = host.window else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
+        let base = (host.readerDocument?.displayName ?? "chat").replacingOccurrences(of: ".pdf", with: "")
+        panel.nameFieldStringValue = "\(base) - \(conv.title)".replacingOccurrences(of: "/", with: "-") + ".md"
+        // Include the question the answer belongs to.
+        var selected = [m]
+        if m.role == .assistant, let i = messages.firstIndex(where: { $0.id == id }),
+           let q = messages[..<i].last(where: { $0.role == .user }) {
+            selected.insert(q, at: 0)
+        }
+        panel.beginSheetModal(for: window) { resp in
+            guard resp == .OK, let url = panel.url else { return }
+            do {
+                try MarkdownExporter.export(to: url, title: host.documentTitle,
+                                            sourcePath: host.readerDocument?.fileURL?.path, sha256: host.currentSHA,
+                                            conversations: [.init(record: conv, messages: selected)])
+            } catch {
+                NSApp.presentError(error)
+            }
+        }
     }
 
     // MARK: Transcript actions

@@ -11,6 +11,7 @@ struct ChatTranscriptView: NSViewRepresentable {
     let version: Int
     let onCopy: (String) -> Void
     let onPage: (Int) -> Void
+    let onAction: (TranscriptAction, String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -33,6 +34,7 @@ struct ChatTranscriptView: NSViewRepresentable {
     func updateNSView(_ web: WKWebView, context: Context) {
         context.coordinator.onCopy = onCopy
         context.coordinator.onPage = onPage
+        context.coordinator.onAction = onAction
         context.coordinator.update(messages: messages, streamingID: streamingID)
     }
 
@@ -40,6 +42,7 @@ struct ChatTranscriptView: NSViewRepresentable {
         weak var web: WKWebView?
         var onCopy: ((String) -> Void)?
         var onPage: ((Int) -> Void)?
+        var onAction: ((TranscriptAction, String) -> Void)?
         private var ready = false
         private var renderedIDs: [String] = []
         private var renderedContent: [String: String] = [:]
@@ -113,6 +116,8 @@ struct ChatTranscriptView: NSViewRepresentable {
                 update(messages: latest.messages, streamingID: latest.streaming)
             case "copy":
                 if let id = body["id"] as? String { onCopy?(id) }
+            case "export", "regenerate", "delete":
+                if let id = body["id"] as? String, let a = TranscriptAction(rawValue: action) { onAction?(a, id) }
             case "page":
                 if let p = body["page"] as? Int { onPage?(p) } else if let s = body["page"] as? String, let p = Int(s) { onPage?(p) }
             default:
@@ -132,6 +137,10 @@ struct ChatTranscriptView: NSViewRepresentable {
             decisionHandler(.allow)
         }
     }
+}
+
+enum TranscriptAction: String {
+    case export, regenerate, delete
 }
 
 /// Avoids the retain cycle WKUserContentController creates with its handlers.

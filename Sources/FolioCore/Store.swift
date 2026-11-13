@@ -397,6 +397,15 @@ public final class Store: @unchecked Sendable {
         }
     }
 
+    public func deleteMessage(id: String) throws {
+        let files = try db.query("SELECT file_path FROM attachments WHERE message_id = ?", [v(id)]).compactMap { $0["file_path"].string }
+        try db.transaction {
+            try db.run("DELETE FROM messages_fts WHERE message_id = ?", [v(id)])
+            try db.run("DELETE FROM messages WHERE id = ?", [v(id)])
+        }
+        for f in files { try? FileManager.default.removeItem(atPath: f) }
+    }
+
     /// Full-text search over all conversations of all documents.
     public func searchMessages(_ text: String, limit: Int = 100) throws -> [MessageSearchHit] {
         guard let match = Store.ftsQuery(text) else { return [] }
