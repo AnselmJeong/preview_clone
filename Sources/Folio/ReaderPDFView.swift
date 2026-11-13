@@ -169,6 +169,48 @@ final class ReaderPDFView: PDFView {
         return ctx.makeImage()
     }
 
+    // MARK: Keyboard
+
+    /// Single-key reading shortcuts, active only while the page view has focus (so the find field
+    /// and chat composer keep their own arrow keys and letters).
+    override func keyDown(with event: NSEvent) {
+        let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        guard mods.isEmpty, let key = event.charactersIgnoringModifiers?.unicodeScalars.first else {
+            super.keyDown(with: event)
+            return
+        }
+        switch Int(key.value) {
+        case NSLeftArrowFunctionKey, NSPageUpFunctionKey:
+            goToPreviousPage(nil)
+        case NSRightArrowFunctionKey, NSPageDownFunctionKey:
+            goToNextPage(nil)
+        case NSHomeFunctionKey:
+            goToFirstPage(nil)
+        case NSEndFunctionKey:
+            goToLastPage(nil)
+        default:
+            if hasTextSelection, let color = Self.highlightColor(forKey: Character(key)) {
+                readerDelegate?.pdfView(self, highlightWith: color.color)
+            } else {
+                super.keyDown(with: event)
+            }
+        }
+    }
+
+    private var hasTextSelection: Bool {
+        guard let text = currentSelection?.string else { return false }
+        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// H = yellow; 1–5 = the five highlight colours in menu order.
+    static func highlightColor(forKey c: Character) -> HighlightColor? {
+        switch c {
+        case "h", "H": return .yellow
+        case "1"..."5": return HighlightColor(rawValue: Int(String(c))! - 1)
+        default: return nil
+        }
+    }
+
     // MARK: Context menu
 
     private var menuAnnotation: PDFAnnotation?
