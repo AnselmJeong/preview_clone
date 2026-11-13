@@ -39,7 +39,12 @@
     s = s.replace(/\u0000C(\d+)\u0000/g, (_, i) => codes[+i]);
 
     // Page citations: [p.12], [p. 12], [pp.3-4] → links to the first page.
-    s = s.replace(/\[(?:pp?\.|page|p)\s?(\d+)((?:\s?[-–,]\s?\d+)*)\]/gi, (m, n, rest) => "[" + n + rest.replace(/\s/g, "") + "](folio-page:" + n + ")");
+    // Page citations: [p.12], [p. 12], [pp.3-4], [p.1, p.3] → one pill per page reference.
+    s = s.replace(/\[((?:(?:pp?\.|page|p)\s?\d+(?:\s?[-–]\s?\d+)?)(?:\s?[,;]\s?(?:(?:pp?\.|page|p)\s?)?\d+(?:\s?[-–]\s?\d+)?)*)\]/gi, (m, inner) =>
+      inner.split(/\s?[,;]\s?/).map((part) => {
+        const r = part.replace(/^(?:pp?\.|page|p)\s?/i, "").replace(/\s/g, "");
+        return "[" + r + "](folio-page:" + parseInt(r, 10) + ")";
+      }).join(" "));
 
     let html = md.render(s);
     // CommonMark won't close **…** next to punctuation in CJK text (e.g. **"강도"**는); finish those here.
