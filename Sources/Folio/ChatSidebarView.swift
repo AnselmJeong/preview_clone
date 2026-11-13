@@ -97,7 +97,7 @@ struct ChatSidebarView: View {
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 7) {
                 hint("text.quote", "텍스트를 선택하고 우클릭 → AI에게 묻기")
-                hint("viewfinder", "⌃⇧⌘4로 그림 영역을 캡처해 첨부")
+                hint("viewfinder", "⌃⌘C로 그림 영역을 캡처하거나, 스크린샷을 ⌘V로 붙여넣기")
                 hint("doc.on.clipboard", "이미지 붙여넣기(⌘V)나 끌어다 놓기")
                 hint("number", "답변의 페이지 번호를 누르면 이동")
             }
@@ -179,7 +179,7 @@ struct ChatSidebarView: View {
                 HStack(spacing: 2) {
                     Button { model.startCapture() } label: { Image(systemName: "viewfinder") }
                         .buttonStyle(QuietIconButtonStyle())
-                        .help("페이지 영역 캡처 (⌃⇧⌘4)")
+                        .help("페이지 영역 캡처 (⌃⌘C)")
                     Button { model.chooseImage() } label: { Image(systemName: "photo") }
                         .buttonStyle(QuietIconButtonStyle())
                         .help("이미지 첨부")
@@ -395,16 +395,41 @@ final class SubmitTextView: NSTextView {
     var onPasteImage: ((Data, String) -> Void)?
 
     override func paste(_ sender: Any?) {
-        let pb = NSPasteboard.general
-        if pb.string(forType: .string) == nil,
-           let image = NSImage(pasteboard: pb),
-           let tiff = image.tiffRepresentation,
-           let rep = NSBitmapImageRep(data: tiff),
-           let png = rep.representation(using: .png, properties: [:]) {
-            onPasteImage?(png, "image/png")
+        if let (data, type) = Self.imageOnPasteboard(NSPasteboard.general) {
+            onPasteImage?(data, type)
             return
         }
         super.paste(sender)
+    }
+
+    /// A plain-text view disables Paste when the clipboard holds only an image, so ⌘V never
+    /// reached `paste(_:)`. Enable it whenever there is an image to take.
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(paste(_:)), Self.imageOnPasteboard(NSPasteboard.general) != nil {
+            return true
+        }
+        return super.validateUserInterfaceItem(item)
+    }
+
+    override var readablePasteboardTypes: [NSPasteboard.PasteboardType] {
+        super.readablePasteboardTypes + [.png, .tiff, .fileURL]
+    }
+
+    /// Image data from the clipboard: a screenshot (⌃⇧⌘4), an image copied from another app, or an
+    /// image file copied in Finder. Text wins when the clipboard also has text (e.g. copied from a web page).
+    static func imageOnPasteboard(_ pb: NSPasteboard) -> (Data, String)? {
+        if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
+           let url = urls.first(where: { UTType(filenameExtension: $0.pathExtension)?.conforms(to: .image) == true }),
+           let data = try? Data(contentsOf: url) {
+            let type = UTType(filenameExtension: url.pathExtension)
+            return (data, type?.conforms(to: .jpeg) == true ? "image/jpeg" : (type?.conforms(to: .png) == true ? "image/png" : "image/other"))
+        }
+        if pb.string(forType: .string) != nil { return nil }
+        if let png = pb.data(forType: .png) { return (png, "image/png") }
+        guard let image = NSImage(pasteboard: pb), let tiff = image.tiffRepresentation,
+              let rep = NSBitmapImageRep(data: tiff),
+              let png = rep.representation(using: .png, properties: [:]) else { return nil }
+        return (png, "image/png")
     }
 
     override func draw(_ dirtyRect: NSRect) {

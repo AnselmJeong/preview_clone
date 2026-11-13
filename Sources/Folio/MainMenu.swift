@@ -153,7 +153,7 @@ enum MainMenu {
             colors.addItem(i)
         }
         m.addItem(submenu(colors))
-        m.addItem(item("영역 캡처해서 AI에 첨부", #selector(ReaderWindowController.startRegionCapture(_:)), "4", [.command, .control, .shift]))
+        m.addItem(item("영역 캡처해서 AI에 첨부", #selector(ReaderWindowController.startRegionCapture(_:)), "c", [.command, .control]))
         m.addItem(.separator())
         m.addItem(item("선택 영역을 AI에게 묻기", #selector(ReaderWindowController.askAIAboutSelection(_:)), "a", [.command, .control]))
         m.addItem(item("선택 영역 설명", #selector(ReaderWindowController.explainSelection(_:)), "", []))
