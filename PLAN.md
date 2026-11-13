@@ -1,6 +1,8 @@
 # PLAN — Preview를 대체하는 가볍고 빠른 PDF 리더 + AI 사이드바
 
-> 상태: 계획서 초안 (구현 전 검토용)
+> 상태: 승인됨, Swift로 구현 중 (개인 사용 전제)
+>
+> 구현하면서 바꾼 점: Xcode 프로젝트/XcodeGen 대신 Swift Package + `scripts/build.sh`로 앱 번들을 만들고, GRDB 대신 시스템 SQLite3를 직접 씁니다(외부 의존성 0). 스캔본 OCR(4.5)은 다음 단계로 미뤘습니다.
 > 작업 이름: **Folio** (가칭, 바꾸기 쉬움)
 
 ## 1. 목표와 원칙
