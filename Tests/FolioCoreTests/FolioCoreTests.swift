@@ -162,3 +162,34 @@ import Testing
         #expect(md.contains("## Assistant"))
     }
 }
+
+@Suite struct ClaudeAuthTests {
+    @Test func parsesStatusJSON() {
+        let out = """
+        {
+          "loggedIn": true,
+          "authMethod": "claude.ai",
+          "apiProvider": "firstParty",
+          "email": "me@example.com",
+          "subscriptionType": "max"
+        }
+        """
+        let s = ClaudeAuthStatus.parse(out)
+        #expect(s?.loggedIn == true)
+        #expect(s?.email == "me@example.com")
+        #expect(s?.summary == "me@example.com · Max")
+        #expect(ClaudeAuthStatus.parse("{\"loggedIn\": false}")?.loggedIn == false)
+        #expect(ClaudeAuthStatus.parse("Not logged in") == nil)
+        #expect(ClaudeAuthStatus(loggedIn: true, authMethod: "oauth_token").summary == "Claude 구독")
+    }
+
+    @Test func readsLoginTerminalOutput() {
+        let link = "https://claude.com/cai/oauth/authorize?code=true&client_id=abc&state=xyz"
+        let raw = "Opening browser to sign in…\r\nIf the browser didn't open, visit: \u{1B}]8;;\(link)\u{07}\u{1B}[94m\(link)\u{1B}[39m\u{1B}]8;;\u{07}\r\nPaste code here if prompted > "
+        let cleaned = ClaudeLoginOutput.clean(raw)
+        #expect(!cleaned.contains("\u{1B}"))
+        #expect(ClaudeLoginOutput.signInURL(in: cleaned)?.absoluteString == link)
+        #expect(ClaudeLoginOutput.asksForCode(cleaned))
+        #expect(ClaudeLoginOutput.reportsSuccess("Login successful."))
+    }
+}

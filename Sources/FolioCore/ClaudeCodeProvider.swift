@@ -2,7 +2,7 @@ import Foundation
 
 /// Uses the user's own, unmodified `claude` CLI (Claude Code) in headless mode, signed in with their
 /// Claude subscription. The app never reads, stores, or forwards Claude credentials: sign-in happens
-/// entirely in the CLI's own flow (`claude` → /login, or `claude auth login`).
+/// entirely in the CLI's own flow (`claude auth login`, which Folio can launch for the user).
 public final class ClaudeCodeProvider: ChatProvider, @unchecked Sendable {
     public let kind: ProviderKind = .claudeCode
     public var executablePath: String?
@@ -160,7 +160,7 @@ public final class ClaudeCodeProvider: ChatProvider, @unchecked Sendable {
     private func run(_ request: ChatRequest, resume: String?,
                      continuation: AsyncThrowingStream<ChatEvent, Error>.Continuation) async throws {
         guard let exe = Self.locate(preferred: executablePath) else {
-            throw ProviderError("Claude Code(`claude`)를 찾을 수 없습니다. 터미널에서 설치하고 `claude`를 실행해 로그인한 뒤, 필요하면 설정에서 경로를 지정하세요.")
+            throw ProviderError("Claude Code(`claude`)를 찾을 수 없습니다. https://claude.com/claude-code 에서 설치한 뒤, 필요하면 설정에서 경로를 지정하세요.")
         }
         try FileManager.default.createDirectory(at: workingDirectory, withIntermediateDirectories: true)
         let promptFile = FileManager.default.temporaryDirectory.appendingPathComponent("folio-system-\(UUID().uuidString).txt")
@@ -177,10 +177,7 @@ public final class ClaudeCodeProvider: ChatProvider, @unchecked Sendable {
         proc.executableURL = URL(fileURLWithPath: exe)
         proc.arguments = arguments(model: request.model, systemPromptFile: promptFile, resume: resume)
         proc.currentDirectoryURL = workingDirectory
-        var env = ProcessInfo.processInfo.environment
-        let exeDir = (exe as NSString).deletingLastPathComponent
-        env["PATH"] = [exeDir, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", env["PATH"] ?? ""].joined(separator: ":")
-        proc.environment = env
+        proc.environment = Self.processEnvironment(executable: exe)
 
         let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
         proc.standardInput = stdin
@@ -255,7 +252,7 @@ public final class ClaudeCodeProvider: ChatProvider, @unchecked Sendable {
     static func friendly(_ msg: String) -> String {
         let lower = msg.lowercased()
         if lower.contains("login") || lower.contains("log in") || lower.contains("not authenticated") || lower.contains("oauth") {
-            return "Claude Code 로그인이 필요합니다. 터미널에서 `claude`를 실행해 로그인하세요.\n\n\(msg)"
+            return "Claude 로그인이 필요합니다. AI 사이드바 위쪽이나 설정(⌘,)의 ‘Claude에 로그인’ 버튼을 누르세요.\n\n\(msg)"
         }
         if lower.contains("limit") {
             return "Claude 사용 한도에 도달했습니다.\n\n\(msg)"

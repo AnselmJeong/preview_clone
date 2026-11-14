@@ -9,6 +9,7 @@ struct ChatSidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if model.provider == .claudeCode { ClaudeLoginBanner() }
             ZStack {
                 ChatTranscriptView(messages: model.messages, streamingID: model.streamingMessageID,
                                    version: model.transcriptVersion,
@@ -21,6 +22,8 @@ struct ChatSidebarView: View {
         }
         .background(Color(nsColor: .textBackgroundColor))
         .onDrop(of: [.fileURL, .image], isTargeted: nil) { model.handleDrop($0) }
+        .onAppear { if model.provider == .claudeCode { ClaudeAccount.shared.refreshIfStale() } }
+        .onChange(of: model.provider) { _, p in if p == .claudeCode { ClaudeAccount.shared.refreshIfStale(0) } }
     }
 
     // MARK: Header
@@ -76,6 +79,10 @@ struct ChatSidebarView: View {
             Button { model.newConversation() } label: { Image(systemName: "square.and.pencil") }
                 .buttonStyle(QuietIconButtonStyle())
                 .help("새 대화 (⌃⌘N)")
+
+            Button { model.openSettings() } label: { Image(systemName: "gearshape") }
+                .buttonStyle(QuietIconButtonStyle())
+                .help("설정 (⌘,)")
         }
         .padding(.leading, 16)
         .padding(.trailing, 10)

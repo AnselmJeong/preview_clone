@@ -326,6 +326,9 @@ final class ChatViewModel: ObservableObject {
             } catch is CancellationError {
             } catch {
                 failure = error
+                // A sign-in problem shows up as a failed request: re-read the login state so the
+                // sidebar can offer "Claude에 로그인".
+                if self?.provider == .claudeCode { ClaudeAccount.shared.refresh() }
             }
             self?.finish(assistantID: assistantID, error: failure)
         }

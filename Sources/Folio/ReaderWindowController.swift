@@ -50,6 +50,7 @@ private extension NSToolbarItem.Identifier {
     static let capture = NSToolbarItem.Identifier("folio.capture")
     static let search = NSToolbarItem.Identifier("folio.search")
     static let ai = NSToolbarItem.Identifier("folio.ai")
+    static let settings = NSToolbarItem.Identifier("folio.settings")
 }
 
 private enum Defaults {
@@ -169,6 +170,14 @@ final class ReaderWindowController: NSWindowController, NSWindowDelegate, NSTool
         toolbar.allowsUserCustomization = true
         toolbar.autosavesConfiguration = true
         window?.toolbar = toolbar
+        // Toolbars saved before the settings button existed don't list it: add it once.
+        let addedKey = "toolbar.settingsItemAdded"
+        if !UserDefaults.standard.bool(forKey: addedKey) {
+            UserDefaults.standard.set(true, forKey: addedKey)
+            if !toolbar.items.contains(where: { $0.itemIdentifier == .settings }) {
+                toolbar.insertItem(withItemIdentifier: .settings, at: toolbar.items.count)
+            }
+        }
     }
 
     // MARK: - Document
@@ -405,7 +414,7 @@ final class ReaderWindowController: NSWindowController, NSWindowDelegate, NSTool
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [.leftSidebar, .sidebarTrackingSeparator, .displayMode, .zoomOut, .zoomIn, .flexibleSpace,
-         .highlight, .capture, .search, .ai]
+         .highlight, .capture, .search, .ai, .settings]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -485,6 +494,11 @@ final class ReaderWindowController: NSWindowController, NSWindowDelegate, NSTool
             searchField = item.searchField
             return item
         case .ai: return button(id, "AI", "sparkles", #selector(toggleAISidebar(_:)))
+        case .settings:
+            let item = button(id, "설정", "gearshape", #selector(AppDelegate.showSettings(_:)))
+            item.target = NSApp.delegate
+            item.toolTip = "설정 (⌘,)"
+            return item
         default: return nil
         }
     }
