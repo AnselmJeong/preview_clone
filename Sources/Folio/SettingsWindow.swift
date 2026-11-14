@@ -53,7 +53,8 @@ struct SettingsView: View {
     private var providersTab: some View {
         Form {
             Section("Claude 구독 (Claude Code CLI)") {
-                Text("터미널에서 `claude`를 설치하고 한 번 실행해 로그인하면, Folio가 그 CLI를 통해 대화합니다. Folio는 로그인 정보를 읽거나 저장하지 않습니다.")
+                ClaudeAccountPanel()
+                Text("로그인은 Claude Code CLI(`claude auth login`)가 브라우저에서 직접 처리합니다. Folio는 로그인 정보를 읽거나 저장하지 않습니다.")
                     .font(.caption).foregroundStyle(.secondary)
                 TextField("CLI 경로 (비우면 자동 탐색)", text: $claudePath)
                     .onChange(of: claudePath) { _, v in AppSettings.claudePath = v }
@@ -61,7 +62,7 @@ struct SettingsView: View {
                     Text(detectedClaude.map { "찾음: \($0)" } ?? "claude를 찾지 못했습니다")
                         .font(.caption).foregroundStyle(detectedClaude == nil ? .red : .secondary)
                     Spacer()
-                    Button("상태 확인") { checkClaude() }
+                    Button("상세 정보") { checkClaude() }
                 }
                 if let claudeCheck { Text(claudeCheck).font(.caption).textSelection(.enabled) }
                 TextField("모델 (sonnet, opus, haiku 또는 전체 이름)", text: $claudeModel)
